@@ -1,0 +1,29 @@
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Node / Web
+web/node_modules/
+web/dist/
+npm-debug.log*
+yarn-debug.log*
+
+# Model weights & checkpoints (download separately)
+backend/models/
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+*.zip

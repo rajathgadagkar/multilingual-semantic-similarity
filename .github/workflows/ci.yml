@@ -1,0 +1,51 @@
+name: CI & Benchmark Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  evaluate-and-test:
+    name: Python Benchmarks & Integrity Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run integrity & benchmark test suite
+        run: python -m unittest discover -s backend/tests -v
+
+      - name: Reproduce 10-language STS-B benchmark table
+        run: |
+          echo "## Multilingual STS-B Test Benchmark (13,790 Pairs × 10 Languages)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          python experiments/scripts/evaluate_predictions.py | tee -a "$GITHUB_STEP_SUMMARY"
+
+  web-typecheck:
+    name: Web App TypeScript Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build client & server bundle
+        run: npm run build

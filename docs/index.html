@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multilingual Semantic Textual Similarity &amp; Hybrid FAQ Search — Interactive Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-soft: #111830;
+      --card: #151e38;
+      --card-hover: #1b2747;
+      --border: #25335a;
+      --text: #eef2ff;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-2: #06b6d4;
+      --accent-3: #10b981;
+      --warn: #f59e0b;
+      --xlm: #6366f1;
+      --mbert: #06b6d4;
+      --distil: #f59e0b;
+      --gold: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: radial-gradient(circle at top right, #17224a 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    a { color: #818cf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 28px 20px 64px; }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(6,182,212,0.12));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .badge {
+      font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+      background: rgba(99,102,241,0.18); border: 1px solid rgba(99,102,241,0.4); color: #c7d2fe;
+    }
+    .badge.cyan { background: rgba(6,182,212,0.15); border-color: rgba(6,182,212,0.4); color: #a5f3fc; }
+    .badge.green { background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.4); color: #a7f3d0; }
+    .hero h1 {
+      font-size: clamp(1.6rem, 3.2vw, 2.35rem);
+      font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px;
+      background: linear-gradient(90deg, #ffffff, #a5b4fc, #67e8f9);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero p { color: var(--muted); max-width: 820px; font-size: 0.98rem; }
+
+    /* KPI Row */
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px; margin-bottom: 24px;
+    }
+    .kpi {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px;
+    }
+    .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .kpi-value { font-size: 1.85rem; font-weight: 800; margin: 4px 0; color: #fff; }
+    .kpi-sub { font-size: 12.5px; color: #94a3b8; }
+
+    /* Navigation Tabs */
+    .tabs {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px;
+      border-bottom: 1px solid var(--border); padding-bottom: 12px;
+    }
+    .tab-btn {
+      background: var(--card); color: var(--muted); border: 1px solid var(--border);
+      padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px;
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover { background: var(--card-hover); color: #fff; }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), #4f46e5);
+      color: #fff; border-color: transparent; box-shadow: 0 4px 16px rgba(99,102,241,0.35);
+    }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* Cards & Grids */
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 18px; }
+    @media (max-width: 560px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px;
+      margin-bottom: 18px;
+    }
+    .card-header {
+      display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+      gap: 10px; margin-bottom: 16px;
+    }
+    .card h2 { font-size: 1.12rem; font-weight: 700; }
+    .card-desc { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+
+    /* Controls */
+    .pill-group { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill {
+      background: var(--bg-soft); color: var(--muted); border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    }
+    .pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:hover td { background: rgba(99,102,241,0.06); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .best { color: #34d399; font-weight: 700; }
+
+    /* Pair Explorer */
+    .pair-card {
+      background: var(--bg-soft); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px; margin-bottom: 12px;
+    }
+    .pair-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .pair-sent { font-size: 14px; margin-bottom: 6px; }
+    .pair-sent span { color: var(--muted); font-weight: 600; margin-right: 6px; font-size: 12px; }
+    .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+    .bar-item label { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; color: var(--muted); }
+    .bar-track { height: 8px; background: #1e293b; border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; }
+
+    /* Search Playground */
+    .search-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    .search-row select, .search-row input {
+      background: var(--bg-soft); color: #fff; border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 14px; font-size: 14px; outline: none;
+    }
+    .search-row input { flex: 1; min-width: 220px; }
+    .search-row input:focus, .search-row select:focus { border-color: var(--accent); }
+    .search-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+      border: none; border-radius: 10px; padding: 11px 20px; font-weight: 700; cursor: pointer;
+    }
+    .sample-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .chip {
+      background: rgba(6,182,212,0.12); color: #a5f3fc; border: 1px solid rgba(6,182,212,0.3);
+      padding: 5px 11px; border-radius: 999px; font-size: 12px; cursor: pointer;
+    }
+    .chip:hover { background: rgba(6,182,212,0.25); }
+    .faq-res {
+      background: var(--bg-soft); border: 1px solid var(--border); border-radius: 12px;
+      padding: 15px; margin-bottom: 10px;
+    }
+    .faq-res-top { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+    .faq-q { font-weight: 700; font-size: 14.5px; color: #fff; }
+    .faq-score {
+      font-size: 12px; font-weight: 700; color: #34d399; white-space: nowrap;
+      background: rgba(16,185,129,0.15); padding: 3px 9px; border-radius: 999px; height: fit-content;
+    }
+    .faq-a { font-size: 13.5px; color: #cbd5e1; }
+
+    /* Pipeline diagram */
+    .pipeline {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px; margin: 14px 0 20px;
+    }
+    .stage {
+      background: var(--bg-soft); border: 1px solid var(--border); border-radius: 14px; padding: 16px;
+    }
+    .stage-num { font-size: 11px; font-weight: 700; color: #818cf8; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stage h3 { font-size: 15px; margin: 4px 0 6px; }
+    .stage p { font-size: 13px; color: var(--muted); }
+
+    footer {
+      text-align: center; color: var(--muted); font-size: 13px; margin-top: 36px;
+      padding-top: 20px; border-top: 1px solid var(--border);
+    }
+    .chart-box { position: relative; height: 320px; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <section class="hero">
+      <div class="badge-row">
+        <span class="badge">NLP &amp; Semantic Search</span>
+        <span class="badge cyan">10 Languages • 86,280 STS-B Pairs</span>
+        <span class="badge green">Hybrid Bi-Encoder + XLM-RoBERTa Cross-Encoder</span>
+      </div>
+      <h1>Multilingual Semantic Textual Similarity &amp; Hybrid FAQ Search</h1>
+      <p>
+        Interactive benchmark explorer and live multilingual FAQ search playground comparing fine-tuned
+        <strong>XLM-RoBERTa</strong>, <strong>mBERT</strong>, and <strong>DistilBERT</strong> across 13,790 test sentence pairs
+        and 979 curated multilingual FAQs.
+      </p>
+    </section>
+
+    <section class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Winning Backbone</div>
+        <div class="kpi-value">XLM-RoBERTa</div>
+        <div class="kpi-sub">Leads on all 10 languages individually</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Test Pearson / Spearman</div>
+        <div class="kpi-value">0.827 / 0.817</div>
+        <div class="kpi-sub">Dev: 0.870 / 0.870 • Cosine: 0.959</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Test MSE / MAE</div>
+        <div class="kpi-value">0.752 / 0.639</div>
+        <div class="kpi-sub">20.7% lower MSE than DistilBERT</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Hybrid FAQ Engine</div>
+        <div class="kpi-value">&lt; 3s CPU</div>
+        <div class="kpi-sub">MPNet Bi-Encoder → XLM-R Re-Ranker</div>
+      </div>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="benchmarks">1. Benchmark Arena</button>
+      <button class="tab-btn" data-tab="languages">2. 10-Language Matrix</button>
+      <button class="tab-btn" data-tab="explorer">3. Sentence-Pair Explorer</button>
+      <button class="tab-btn" data-tab="playground">4. Live FAQ Search Playground</button>
+      <button class="tab-btn" data-tab="architecture">5. Hybrid Architecture</button>
+    </nav>
+
+    <!-- TAB 1: BENCHMARKS -->
+    <section id="tab-benchmarks" class="panel active">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <h2>Model Correlation &amp; Cosine Comparison</h2>
+            <div class="pill-group" id="splitToggle">
+              <button class="pill active" data-split="overall">Test Set (13,790)</button>
+              <button class="pill" data-split="dev">Dev Set (15,000)</button>
+            </div>
+          </div>
+          <p class="card-desc">Higher is better. XLM-RoBERTa outperforms mBERT and DistilBERT across every correlation metric.</p>
+          <div class="chart-box"><canvas id="overallChart"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Prediction Error Distribution (Test Set)</h2>
+          </div>
+          <p class="card-desc">Residual error (Predicted − Gold) across all 13,790 test sentence pairs. Tighter peak around 0.00 indicates better calibration.</p>
+          <div class="chart-box"><canvas id="errorChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Complete Evaluation Scorecard</h2>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th class="num">Dev Pearson</th>
+                <th class="num">Dev Spearman</th>
+                <th class="num">Dev MSE</th>
+                <th class="num">Test Pearson</th>
+                <th class="num">Test Spearman</th>
+                <th class="num">Test Cosine</th>
+                <th class="num">Test MSE</th>
+                <th class="num">Test MAE</th>
+                <th class="num">Test RMSE</th>
+              </tr>
+            </thead>
+            <tbody id="scorecardBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: 10-LANGUAGE MATRIX -->
+    <section id="tab-languages" class="panel">
+      <div class="card">
+        <div class="card-header">
+          <h2>Per-Language Test Performance (1,379 Pairs / Language)</h2>
+          <div class="pill-group" id="langMetricToggle">
+            <button class="pill active" data-metric="pearson">Pearson r</button>
+            <button class="pill" data-metric="spearman">Spearman ρ</button>
+            <button class="pill" data-metric="mse">MSE (lower better)</button>
+          </div>
+        </div>
+        <div class="chart-box" style="height:360px;"><canvas id="langChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2>10-Language Detailed Breakdown</h2>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Language</th>
+                <th class="num">XLM-R Pearson</th>
+                <th class="num">mBERT Pearson</th>
+                <th class="num">DistilBERT Pearson</th>
+                <th class="num">XLM-R Spearman</th>
+                <th class="num">XLM-R MSE</th>
+                <th class="num">Δ vs DistilBERT (r)</th>
+              </tr>
+            </thead>
+            <tbody id="langTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: SENTENCE PAIR EXPLORER -->
+    <section id="tab-explorer" class="panel">
+      <div class="card">
+        <div class="card-header">
+          <h2>Multilingual Sentence-Pair Prediction Explorer</h2>
+          <div class="pill-group">
+            <select id="pairLangFilter" style="background:var(--bg-soft);color:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;">
+              <option value="all">All 10 Languages</option>
+            </select>
+            <select id="pairTierFilter" style="background:var(--bg-soft);color:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;">
+              <option value="all">All Similarity Tiers</option>
+              <option value="high">High Similarity (≥ 4.0)</option>
+              <option value="mid">Moderate (2.0 – 3.9)</option>
+              <option value="low">Low Similarity (&lt; 2.0)</option>
+            </select>
+          </div>
+        </div>
+        <p class="card-desc">Real test-set sentence pairs from <code>stsb_multi_mt</code> comparing human gold annotations (0–5) with predictions from all three fine-tuned models.</p>
+        <div id="pairList"></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: LIVE FAQ SEARCH PLAYGROUND -->
+    <section id="tab-playground" class="panel">
+      <div class="card">
+        <div class="card-header">
+          <h2>Live Multilingual FAQ Search Playground</h2>
+          <span class="badge cyan" id="faqCountBadge">979 Curated MFAQ Entries</span>
+        </div>
+        <p class="card-desc">
+          Interactive browser preview over the project's 5-language MFAQ corpus (EN, DE, ES, FR, IT).
+          Runs a lightweight client-side TF-IDF + character n-gram vector search in-browser to demonstrate the retrieval flow;
+          for full neural Bi-Encoder + XLM-RoBERTa Cross-Encoder re-ranking, run <code>backend/semantic_engine.py</code> locally.
+        </p>
+
+        <div class="search-row">
+          <select id="faqLang">
+            <option value="en">English (EN)</option>
+            <option value="de">Deutsch (DE)</option>
+            <option value="es">Español (ES)</option>
+            <option value="fr">Français (FR)</option>
+            <option value="it">Italiano (IT)</option>
+          </select>
+          <input id="faqQuery" type="text" placeholder="Ask a question in the selected language..." />
+          <button class="search-btn" id="faqSearchBtn">Search FAQs</button>
+        </div>
+
+        <div class="sample-chips" id="sampleChips"></div>
+        <div id="faqMeta" style="font-size:12.5px;color:var(--muted);margin-bottom:10px;"></div>
+        <div id="faqResults"></div>
+      </div>
+    </section>
+
+    <!-- TAB 5: ARCHITECTURE -->
+    <section id="tab-architecture" class="panel">
+      <div class="card">
+        <h2>Two-Stage Hybrid Retrieval &amp; Re-Ranking Pipeline</h2>
+        <p class="card-desc">Designed for local-first CPU deployment (&lt; 3s latency) without sacrificing token-level semantic precision.</p>
+        <div class="pipeline">
+          <div class="stage">
+            <div class="stage-num">Stage 0 • Offline Indexing</div>
+            <h3>768-d FAQ Embeddings</h3>
+            <p>All language FAQ questions are encoded once at startup with <code>paraphrase-multilingual-mpnet-base-v2</code> and L2-normalized.</p>
+          </div>
+          <div class="stage">
+            <div class="stage-num">Stage 1 • Fast Recall</div>
+            <h3>Bi-Encoder Retrieval</h3>
+            <p>Encodes the incoming query once and retrieves the Top-20 semantic candidates via cosine similarity in milliseconds.</p>
+          </div>
+          <div class="stage">
+            <div class="stage-num">Stage 2 • Precision</div>
+            <h3>XLM-RoBERTa Re-Ranker</h3>
+            <p>Jointly scores each <code>[CLS] query [SEP] FAQ</code> candidate pair with full cross-attention to select the most accurate answer.</p>
+          </div>
+          <div class="stage">
+            <div class="stage-num">Stage 3 • Delivery</div>
+            <h3>FastAPI + Express + React</h3>
+            <p>Serves ranked answers, cosine similarity, cross-encoder score, and latency to a responsive multilingual web client.</p>
+          </div>
+        </div>
+
+        <h2 style="margin-top:16px;margin-bottom:10px;">Architecture Trade-Off Matrix</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Approach</th>
+                <th>Precision</th>
+                <th>CPU Latency</th>
+                <th>Scalability</th>
+                <th>Semantic Depth</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Pure Cross-Encoder</td><td>Very High</td><td>Moderate–High (O(N))</td><td>Low</td><td>Token-level</td></tr>
+              <tr><td>Pure Bi-Encoder</td><td>Medium</td><td>Very Low (O(1))</td><td>Very High</td><td>Embedding-level</td></tr>
+              <tr><td>BM25 / Lexical</td><td>Low</td><td>Very Low</td><td>Very High</td><td>Keyword overlap only</td></tr>
+              <tr><td>Cloud LLMs</td><td>High</td><td>Very High (API/GPU)</td><td>Moderate</td><td>Very High</td></tr>
+              <tr><td class="best">Hybrid Bi-Encoder + Cross-Encoder (Ours)</td><td class="best">High</td><td class="best">Low–Moderate (&lt; 3s)</td><td class="best">High (FAISS-ready)</td><td class="best">Two-stage Hybrid</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      Built by <strong>Rajath Gadagkar</strong> (<a href="mailto:rajathgadagkar@gmail.com">rajathgadagkar@gmail.com</a>) •
+      MIT License • Powered by real evaluation data from <code>stsb_multi_mt</code> &amp; <code>clips/mfaq</code>.
+    </footer>
+  </div>
+
+  <script>
+    let DATA = null;
+    let overallChart = null;
+    let errorChart = null;
+    let langChart = null;
+
+    const SAMPLE_QUERIES = {
+      en: [
+        "Does Docker or Python work on M1 Mac Mini?",
+        "Is Adobe Photoshop supported on M1?",
+        "Does 1Password work on Apple Silicon?",
+        "Can I run VS Code on M1 Mac?"
+      ],
+      de: [
+        "Ab wann spricht man von einer Maschine?",
+        "Welche Garantie gilt für Produkte?",
+        "Wie funktioniert die Rückgabe?",
+        "Kann ich meine Bestellung ändern?"
+      ],
+      es: [
+        "¿Cómo puedo contactar con soporte?",
+        "¿Cuál es el tiempo de entrega?",
+        "¿Cómo cambio mi contraseña?",
+        "¿Puedo cancelar mi pedido?"
+      ],
+      fr: [
+        "Mon meuble a changé de couleur après application",
+        "Comment suivre ma commande ?",
+        "Quels sont les délais de livraison ?",
+        "Comment effectuer un retour ?"
+      ],
+      it: [
+        "A chi mi rivolgo in caso di guasti al contatore?",
+        "Come posso cambiare la fornitura?",
+        "Come funziona la bolletta online?",
+        "Quali sono i tempi di attivazione?"
+      ]
+    };
+
+    // Tab switching
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+      });
+    });
+
+    function renderScorecard() {
+      const tbody = document.getElementById("scorecardBody");
+      const order = ["XLM-RoBERTa", "mBERT", "DistilBERT"];
+      tbody.innerHTML = order.map((name, idx) => {
+        const m = DATA.metrics[name];
+        const cls = idx === 0 ? "best" : "";
+        return `<tr>
+          <td class="${cls}"><strong>${name}</strong></td>
+          <td class="num ${cls}">${m.dev.pearson.toFixed(4)}</td>
+          <td class="num ${cls}">${m.dev.spearman.toFixed(4)}</td>
+          <td class="num ${cls}">${m.dev.mse.toFixed(4)}</td>
+          <td class="num ${cls}">${m.overall.pearson.toFixed(4)}</td>
+          <td class="num ${cls}">${m.overall.spearman.toFixed(4)}</td>
+          <td class="num ${cls}">${m.overall.cosine.toFixed(4)}</td>
+          <td class="num ${cls}">${m.overall.mse.toFixed(4)}</td>
+          <td class="num ${cls}">${m.overall.mae.toFixed(4)}</td>
+          <td class="num ${cls}">${m.overall.rmse.toFixed(4)}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function renderOverallChart(split = "overall") {
+      const ctx = document.getElementById("overallChart");
+      const labels = ["Pearson r", "Spearman ρ", "Cosine Sim"];
+      const getVals = (model) => {
+        const d = DATA.metrics[model][split];
+        return [d.pearson, d.spearman, d.cosine];
+      };
+      if (overallChart) overallChart.destroy();
+      overallChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "XLM-RoBERTa", data: getVals("XLM-RoBERTa"), backgroundColor: "#6366f1", borderRadius: 6 },
+            { label: "mBERT", data: getVals("mBERT"), backgroundColor: "#06b6d4", borderRadius: 6 },
+            { label: "DistilBERT", data: getVals("DistilBERT"), backgroundColor: "#f59e0b", borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { min: 0.7, max: 1.0, grid: { color: "rgba(148,163,184,0.12)" }, ticks: { color: "#94a3b8" } },
+            x: { grid: { display: false }, ticks: { color: "#e2e8f0" } }
+          },
+          plugins: { legend: { labels: { color: "#e2e8f0" } } }
+        }
+      });
+    }
+
+    function renderErrorChart() {
+      const ctx = document.getElementById("errorChart");
+      const h = DATA.error_histogram;
+      if (errorChart) errorChart.destroy();
+      errorChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: h.bin_labels,
+          datasets: [
+            { label: "XLM-RoBERTa", data: h.counts["XLM-RoBERTa"], borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.15)", fill: true, tension: 0.35, pointRadius: 2 },
+            { label: "mBERT", data: h.counts["mBERT"], borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.08)", fill: false, tension: 0.35, pointRadius: 2 },
+            { label: "DistilBERT", data: h.counts["DistilBERT"], borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)", fill: false, tension: 0.35, pointRadius: 2 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: { grid: { color: "rgba(148,163,184,0.12)" }, ticks: { color: "#94a3b8" } },
+            x: { grid: { display: false }, ticks: { color: "#94a3b8", maxRotation: 45, autoSkip: true, maxTicksLimit: 10 } }
+          },
+          plugins: { legend: { labels: { color: "#e2e8f0" } } }
+        }
+      });
+    }
+
+    function renderLangSection(metric = "pearson") {
+      const ctx = document.getElementById("langChart");
+      const langs = DATA.languages;
+      const labels = langs.map(l => `${l.name} (${l.code.toUpperCase()})`);
+      const series = (m) => langs.map(l => DATA.metrics[m].per_language[l.code][metric]);
+      if (langChart) langChart.destroy();
+      langChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "XLM-RoBERTa", data: series("XLM-RoBERTa"), backgroundColor: "#6366f1", borderRadius: 4 },
+            { label: "mBERT", data: series("mBERT"), backgroundColor: "#06b6d4", borderRadius: 4 },
+            { label: "DistilBERT", data: series("DistilBERT"), backgroundColor: "#f59e0b", borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y: {
+              min: metric === "mse" ? 0.55 : 0.72,
+              max: metric === "mse" ? 1.1 : 0.88,
+              grid: { color: "rgba(148,163,184,0.12)" },
+              ticks: { color: "#94a3b8" }
+            },
+            x: { grid: { display: false }, ticks: { color: "#e2e8f0" } }
+          },
+          plugins: { legend: { labels: { color: "#e2e8f0" } } }
+        }
+      });
+
+      const tbody = document.getElementById("langTableBody");
+      const sorted = [...langs].sort((a, b) =>
+        DATA.metrics["XLM-RoBERTa"].per_language[b.code].pearson -
+        DATA.metrics["XLM-RoBERTa"].per_language[a.code].pearson
+      );
+      tbody.innerHTML = sorted.map(l => {
+        const x = DATA.metrics["XLM-RoBERTa"].per_language[l.code];
+        const m = DATA.metrics["mBERT"].per_language[l.code];
+        const d = DATA.metrics["DistilBERT"].per_language[l.code];
+        const gain = (x.pearson - d.pearson).toFixed(4);
+        return `<tr>
+          <td><strong>${l.name}</strong> <span style="color:var(--muted)">(${l.code})</span></td>
+          <td class="num best">${x.pearson.toFixed(4)}</td>
+          <td class="num">${m.pearson.toFixed(4)}</td>
+          <td class="num">${d.pearson.toFixed(4)}</td>
+          <td class="num">${x.spearman.toFixed(4)}</td>
+          <td class="num">${x.mse.toFixed(4)}</td>
+          <td class="num best">+${gain}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function renderPairs() {
+      const lang = document.getElementById("pairLangFilter").value;
+      const tier = document.getElementById("pairTierFilter").value;
+      const filtered = DATA.sample_pairs.filter(p => {
+        if (lang !== "all" && p.lang !== lang) return false;
+        if (tier === "high" && p.gold < 4.0) return false;
+        if (tier === "mid" && (p.gold < 2.0 || p.gold >= 4.0)) return false;
+        if (tier === "low" && p.gold >= 2.0) return false;
+        return true;
+      });
+      const el = document.getElementById("pairList");
+      const bar = (label, val, color) => {
+        const pct = Math.max(0, Math.min(100, (val / 5) * 100));
+        return `<div class="bar-item">
+          <label><span>${label}</span><strong style="color:#fff">${val.toFixed(2)} / 5</strong></label>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        </div>`;
+      };
+      el.innerHTML = filtered.slice(0, 24).map(p => `
+        <div class="pair-card">
+          <div class="pair-meta">
+            <span class="badge">${p.lang_name} (${p.lang.toUpperCase()})</span>
+            <span class="badge green">Gold: ${p.gold.toFixed(2)}</span>
+          </div>
+          <div class="pair-sent"><span>S1:</span>${escapeHtml(p.sentence1)}</div>
+          <div class="pair-sent"><span>S2:</span>${escapeHtml(p.sentence2)}</div>
+          <div class="bars">
+            ${bar("Human Gold", p.gold, "#10b981")}
+            ${bar("XLM-RoBERTa", p.xlm_roberta, "#6366f1")}
+            ${bar("mBERT", p.mbert, "#06b6d4")}
+            ${bar("DistilBERT", p.distilbert, "#f59e0b")}
+          </div>
+        </div>
+      `).join("") || `<p style="color:var(--muted)">No pairs match this filter.</p>`;
+    }
+
+    // Lightweight client-side hybrid word + character 3-gram cosine similarity
+    function vectorize(text) {
+      const norm = text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
+      const vec = new Map();
+      const words = norm.split(" ").filter(w => w.length > 1);
+      for (const w of words) vec.set("w:" + w, (vec.get("w:" + w) || 0) + 2.0);
+      const compact = " " + norm + " ";
+      for (let i = 0; i < compact.length - 2; i++) {
+        const g = compact.slice(i, i + 3);
+        vec.set("g:" + g, (vec.get("g:" + g) || 0) + 0.5);
+      }
+      return vec;
+    }
+
+    function cosineSim(v1, v2) {
+      let dot = 0, n1 = 0, n2 = 0;
+      for (const [k, val] of v1) {
+        n1 += val * val;
+        if (v2.has(k)) dot += val * v2.get(k);
+      }
+      for (const val of v2.values()) n2 += val * val;
+      return (n1 && n2) ? dot / (Math.sqrt(n1) * Math.sqrt(n2)) : 0;
+    }
+
+    function renderSampleChips(lang) {
+      const chips = document.getElementById("sampleChips");
+      chips.innerHTML = (SAMPLE_QUERIES[lang] || []).map(q =>
+        `<button class="chip" type="button">${escapeHtml(q)}</button>`
+      ).join("");
+      chips.querySelectorAll(".chip").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.getElementById("faqQuery").value = btn.textContent;
+          runFaqSearch();
+        });
+      });
+    }
+
+    function runFaqSearch() {
+      const lang = document.getElementById("faqLang").value;
+      const query = document.getElementById("faqQuery").value.trim();
+      const corpus = DATA.mfaq[lang] || [];
+      const resEl = document.getElementById("faqResults");
+      const metaEl = document.getElementById("faqMeta");
+
+      if (!query) {
+        metaEl.textContent = `Showing first 5 FAQs from ${corpus.length} entries (${lang.toUpperCase()}). Type a query or click an example above.`;
+        resEl.innerHTML = corpus.slice(0, 5).map(item => `
+          <div class="faq-res">
+            <div class="faq-res-top"><div class="faq-q">${escapeHtml(item.q)}</div></div>
+            <div class="faq-a">${escapeHtml(item.a)}</div>
+          </div>`).join("");
+        return;
+      }
+
+      const t0 = performance.now();
+      const qVec = vectorize(query);
+      const scored = corpus.map(item => {
+        const qSim = cosineSim(qVec, vectorize(item.q));
+        const qaSim = cosineSim(qVec, vectorize(item.q + " " + item.a));
+        const score = 0.72 * qSim + 0.28 * qaSim;
+        return { ...item, score };
+      }).sort((a, b) => b.score - a.score).slice(0, 5);
+      const ms = (performance.now() - t0).toFixed(1);
+
+      metaEl.textContent = `Top 5 matches from ${corpus.length} ${lang.toUpperCase()} FAQs in ${ms} ms (client-side vector preview)`;
+      resEl.innerHTML = scored.map((item, idx) => `
+        <div class="faq-res">
+          <div class="faq-res-top">
+            <div class="faq-q">#${idx + 1} ${escapeHtml(item.q)}</div>
+            <span class="faq-score">Similarity: ${(item.score * 100).toFixed(1)}%</span>
+          </div>
+          <div class="faq-a">${escapeHtml(item.a)}</div>
+        </div>
+      `).join("");
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    async function init() {
+      const resp = await fetch("./data/dashboard_data.json");
+      DATA = await resp.json();
+
+      const totalFaqs = Object.values(DATA.mfaq).reduce((acc, arr) => acc + arr.length, 0);
+      document.getElementById("faqCountBadge").textContent = `${totalFaqs} Curated MFAQ Entries`;
+
+      // Populate language filter
+      const pairLang = document.getElementById("pairLangFilter");
+      DATA.languages.forEach(l => {
+        const opt = document.createElement("option");
+        opt.value = l.code;
+        opt.textContent = `${l.name} (${l.code.toUpperCase()})`;
+        pairLang.appendChild(opt);
+      });
+
+      renderScorecard();
+      renderOverallChart("overall");
+      renderErrorChart();
+      renderLangSection("pearson");
+      renderPairs();
+      renderSampleChips("en");
+      runFaqSearch();
+
+      // Event listeners
+      document.querySelectorAll("#splitToggle .pill").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#splitToggle .pill").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderOverallChart(btn.dataset.split);
+        });
+      });
+
+      document.querySelectorAll("#langMetricToggle .pill").forEach(btn => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#langMetricToggle .pill").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          renderLangSection(btn.dataset.metric);
+        });
+      });
+
+      pairLang.addEventListener("change", renderPairs);
+      document.getElementById("pairTierFilter").addEventListener("change", renderPairs);
+      document.getElementById("faqLang").addEventListener("change", e => {
+        renderSampleChips(e.target.value);
+        document.getElementById("faqQuery").value = "";
+        runFaqSearch();
+      });
+      document.getElementById("faqSearchBtn").addEventListener("click", runFaqSearch);
+      document.getElementById("faqQuery").addEventListener("keydown", e => {
+        if (e.key === "Enter") runFaqSearch();
+      });
+    }
+
+    init().catch(err => {
+      console.error("Failed to load dashboard data:", err);
+      document.querySelector(".container").insertAdjacentHTML(
+        "afterbegin",
+        `<div class="card" style="border-color:#ef4444;color:#fecaca;">Failed to load <code>data/dashboard_data.json</code>. Serve <code>docs/</code> over HTTP (or GitHub Pages) to view interactive data.</div>`
+      );
+    });
+  </script>
+</body>
+</html>
